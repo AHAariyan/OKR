@@ -1,4 +1,5 @@
 /Users/edutech/PseudoCode/Official_Project/OKR-System/backend/src/main/java/com/onnorokom/okr/OkrSystemApplication.java
+/Users/edutech/PseudoCode/Official_Project/OKR-System/backend/src/main/java/com/onnorokom/okr/config/GlobalExceptionHandler.java
 /Users/edutech/PseudoCode/Official_Project/OKR-System/backend/src/main/java/com/onnorokom/okr/config/SecurityConfig.java
 /Users/edutech/PseudoCode/Official_Project/OKR-System/backend/src/main/java/com/onnorokom/okr/controller/AdminController.java
 /Users/edutech/PseudoCode/Official_Project/OKR-System/backend/src/main/java/com/onnorokom/okr/controller/AuthController.java
@@ -9,6 +10,8 @@
 /Users/edutech/PseudoCode/Official_Project/OKR-System/backend/src/main/java/com/onnorokom/okr/dto/AuthDto.java
 /Users/edutech/PseudoCode/Official_Project/OKR-System/backend/src/main/java/com/onnorokom/okr/dto/CreateCycleRequest.java
 /Users/edutech/PseudoCode/Official_Project/OKR-System/backend/src/main/java/com/onnorokom/okr/dto/CreateDepartmentRequest.java
+/Users/edutech/PseudoCode/Official_Project/OKR-System/backend/src/main/java/com/onnorokom/okr/dto/CreateKeyResultRequest.java
+/Users/edutech/PseudoCode/Official_Project/OKR-System/backend/src/main/java/com/onnorokom/okr/dto/CreateObjectiveRequest.java
 /Users/edutech/PseudoCode/Official_Project/OKR-System/backend/src/main/java/com/onnorokom/okr/dto/CreateTeamRequest.java
 /Users/edutech/PseudoCode/Official_Project/OKR-System/backend/src/main/java/com/onnorokom/okr/dto/CreateUserRequest.java
 /Users/edutech/PseudoCode/Official_Project/OKR-System/backend/src/main/java/com/onnorokom/okr/dto/CycleDto.java
@@ -16,6 +19,7 @@
 /Users/edutech/PseudoCode/Official_Project/OKR-System/backend/src/main/java/com/onnorokom/okr/dto/DepartmentDto.java
 /Users/edutech/PseudoCode/Official_Project/OKR-System/backend/src/main/java/com/onnorokom/okr/dto/KeyResultDto.java
 /Users/edutech/PseudoCode/Official_Project/OKR-System/backend/src/main/java/com/onnorokom/okr/dto/ObjectiveDto.java
+/Users/edutech/PseudoCode/Official_Project/OKR-System/backend/src/main/java/com/onnorokom/okr/dto/ProfileDto.java
 /Users/edutech/PseudoCode/Official_Project/OKR-System/backend/src/main/java/com/onnorokom/okr/dto/SheetDetailDto.java
 /Users/edutech/PseudoCode/Official_Project/OKR-System/backend/src/main/java/com/onnorokom/okr/dto/SheetSummaryDto.java
 /Users/edutech/PseudoCode/Official_Project/OKR-System/backend/src/main/java/com/onnorokom/okr/dto/TeamDto.java

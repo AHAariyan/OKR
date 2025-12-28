@@ -56,6 +56,9 @@ public class KeyResult {
     @Column(name = "sort_order")
     private Integer sortOrder = 0;
 
+    @Column(name = "weight")
+    private Integer weight = 0;
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private Instant createdAt;
 }

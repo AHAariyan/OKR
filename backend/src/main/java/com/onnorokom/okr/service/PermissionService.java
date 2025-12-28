@@ -8,4 +8,8 @@ public interface PermissionService {
     boolean canEditSheet(User actor, OkrSheet sheet);
 
     boolean canEditKeyResult(User actor, KeyResult kr);
+
+    boolean isSuperAdmin(User actor);
+
+    boolean isOrgLeadership(User actor);
 }

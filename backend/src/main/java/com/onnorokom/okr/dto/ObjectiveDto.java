@@ -11,6 +11,7 @@ public class ObjectiveDto {
     private String ownerName;
     private Double computedProgress;
     private Integer sortOrder;
+    private Integer weight;
 
     private List<KeyResultDto> keyResults;
 }

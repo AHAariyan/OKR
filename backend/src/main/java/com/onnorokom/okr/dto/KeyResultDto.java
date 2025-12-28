@@ -20,6 +20,7 @@ public class KeyResultDto {
     private String comments;
 
     private Integer sortOrder;
+    private Integer weight;
 
     private boolean canEdit;
 }

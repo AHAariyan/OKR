@@ -9,6 +9,7 @@ public class UpdateKeyResultRequest {
     private Double currentValue;
     private Double startValue;
     private Double targetValue;
+    private Integer weight;
     private String confidenceLevel;
     private LocalDate deadline;
     private String alignedProjects;

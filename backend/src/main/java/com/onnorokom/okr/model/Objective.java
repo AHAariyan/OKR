@@ -30,6 +30,9 @@ public class Objective {
     @Column(name = "sort_order")
     private Integer sortOrder = 0;
 
+    @Column(name = "weight")
+    private Integer weight = 100;
+
     @Column(name = "computed_progress")
     private Double computedProgress = 0.0;
 

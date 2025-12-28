@@ -40,39 +40,63 @@ public class OkrServiceImpl implements OkrService {
     public DashboardDto getDashboard(User user) {
         Optional<Cycle> cycleOpt = cycleService.getActiveCycle();
         if (cycleOpt.isEmpty()) {
-            return new DashboardDto(); // Or empty list
+            return new DashboardDto();
         }
         Cycle cycle = cycleOpt.get();
         UUID cycleId = cycle.getId();
 
-        // Spec: Dashboard card order: Company -> Team(s) -> Department -> Personal
-
         List<SheetSummaryDto> summaries = new ArrayList<>();
 
-        // 1. Company
+        // Check if user is ORG_LEADERSHIP or SUPER_ADMIN (they see everything)
+        boolean isOrgLeadershipOrAdmin = permissionService.isSuperAdmin(user) || permissionService.isOrgLeadership(user);
+
+        // 1. Company OKRs (visible to all)
         List<OkrSheet> companySheets = sheetRepository.findByCycleIdAndScopeType(cycleId, "COMPANY");
         companySheets.forEach(s -> summaries.add(mapToSummary(s, "Company", cycle)));
 
-        // 2. Teams (Permitted)
-        // For MVP, showing User's Team. RBAC later for "permitted".
-        // If user has a team, show it.
-        if (user.getTeam() != null) {
-            List<OkrSheet> teamSheets = sheetRepository.findByCycleIdAndScopeTypeAndScopeId(cycleId, "TEAM",
-                    user.getTeam().getId());
+        // 2. Team OKRs
+        if (isOrgLeadershipOrAdmin) {
+            // ORG_LEADERSHIP and SUPER_ADMIN see ALL team cards
+            List<Team> allTeams = teamRepository.findAll();
+            for (Team team : allTeams) {
+                List<OkrSheet> teamSheets = sheetRepository.findByCycleIdAndScopeTypeAndScopeId(cycleId, "TEAM", team.getId());
+                teamSheets.forEach(s -> summaries.add(mapToSummary(s, team.getName(), cycle)));
+            }
+        } else if (user.getTeam() != null) {
+            // Regular users only see their own team
+            List<OkrSheet> teamSheets = sheetRepository.findByCycleIdAndScopeTypeAndScopeId(cycleId, "TEAM", user.getTeam().getId());
             teamSheets.forEach(s -> summaries.add(mapToSummary(s, user.getTeam().getName(), cycle)));
         }
 
-        // 3. Department
-        if (user.getDepartment() != null) {
-            List<OkrSheet> deptSheets = sheetRepository.findByCycleIdAndScopeTypeAndScopeId(cycleId, "DEPARTMENT",
-                    user.getDepartment().getId());
+        // 3. Department OKRs
+        if (isOrgLeadershipOrAdmin) {
+            // ORG_LEADERSHIP and SUPER_ADMIN see ALL department cards
+            List<Department> allDepts = departmentRepository.findAll();
+            for (Department dept : allDepts) {
+                List<OkrSheet> deptSheets = sheetRepository.findByCycleIdAndScopeTypeAndScopeId(cycleId, "DEPARTMENT", dept.getId());
+                deptSheets.forEach(s -> summaries.add(mapToSummary(s, dept.getName(), cycle)));
+            }
+        } else if (user.getDepartment() != null) {
+            // Regular users only see their own department
+            List<OkrSheet> deptSheets = sheetRepository.findByCycleIdAndScopeTypeAndScopeId(cycleId, "DEPARTMENT", user.getDepartment().getId());
             deptSheets.forEach(s -> summaries.add(mapToSummary(s, user.getDepartment().getName(), cycle)));
         }
 
-        // 4. Personal
-        List<OkrSheet> personalSheets = sheetRepository.findByCycleIdAndScopeTypeAndScopeId(cycleId, "PERSONAL",
-                user.getId());
-        personalSheets.forEach(s -> summaries.add(mapToSummary(s, "My OKRs", cycle)));
+        // 4. Personal OKRs
+        if (isOrgLeadershipOrAdmin) {
+            // ORG_LEADERSHIP and SUPER_ADMIN see ALL personal OKR cards
+            List<OkrSheet> allPersonalSheets = sheetRepository.findByCycleIdAndScopeType(cycleId, "PERSONAL");
+            for (OkrSheet s : allPersonalSheets) {
+                String ownerName = userRepository.findById(s.getScopeId())
+                        .map(u -> u.getName() != null ? u.getName() : u.getEmail())
+                        .orElse("Personal");
+                summaries.add(mapToSummary(s, ownerName, cycle));
+            }
+        } else {
+            // Regular users only see their own personal OKR
+            List<OkrSheet> personalSheets = sheetRepository.findByCycleIdAndScopeTypeAndScopeId(cycleId, "PERSONAL", user.getId());
+            personalSheets.forEach(s -> summaries.add(mapToSummary(s, "My OKRs", cycle)));
+        }
 
         DashboardDto dashboard = new DashboardDto();
         dashboard.setSheets(summaries);
@@ -84,10 +108,6 @@ public class OkrServiceImpl implements OkrService {
         dto.setId(sheet.getId());
         dto.setScopeType(sheet.getScopeType());
         dto.setScopeId(sheet.getScopeId());
-
-        // Resolve title dynamically if needed, but fallback is good for now
-        // Ideally we fetch name from DB if not passed, but for optimization we passed
-        // it.
         dto.setTitle(titleFallback);
 
         dto.setComputedOverallProgress(sheet.getComputedOverallProgress());
@@ -95,7 +115,7 @@ public class OkrServiceImpl implements OkrService {
         dto.setDaysRemaining(cycleService.calculateDaysRemaining(cycle));
         dto.setTotalDays(cycleService.calculateTotalDays(cycle));
 
-        // Get Top Objectives for preview (e.g. 3)
+        // Get Top Objectives for preview
         List<Objective> objs = objectiveRepository.findBySheetIdOrderBySortOrderAsc(sheet.getId());
         List<SheetSummaryDto.ObjectiveSummaryDto> objSummaries = objs.stream().limit(3).map(o -> {
             SheetSummaryDto.ObjectiveSummaryDto os = new SheetSummaryDto.ObjectiveSummaryDto();
@@ -113,7 +133,6 @@ public class OkrServiceImpl implements OkrService {
         OkrSheet sheet = sheetRepository.findById(sheetId).orElseThrow(() -> new RuntimeException("Sheet not found"));
         Cycle cycle = sheet.getCycle();
 
-        // Determine current user from security context to check permissions
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         User currentUser = userRepository.findByEmail(email).orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -130,7 +149,7 @@ public class OkrServiceImpl implements OkrService {
         // Resolving Title
         String title = "OKR Sheet";
         if ("COMPANY".equals(sheet.getScopeType()))
-            title = "Company"; // Name fetched via ID ideally
+            title = "Company";
         else if ("TEAM".equals(sheet.getScopeType()))
             title = teamRepository.findById(sheet.getScopeId()).map(Team::getName).orElse("Team");
         else if ("DEPARTMENT".equals(sheet.getScopeType()))
@@ -154,9 +173,10 @@ public class OkrServiceImpl implements OkrService {
         ObjectiveDto dto = new ObjectiveDto();
         dto.setId(obj.getId());
         dto.setTitle(obj.getTitle());
-        dto.setOwnerName(obj.getOwner() != null ? obj.getOwner().getEmail() : null);
+        dto.setOwnerName(obj.getOwner() != null ? (obj.getOwner().getName() != null ? obj.getOwner().getName() : obj.getOwner().getEmail()) : null);
         dto.setComputedProgress(obj.getComputedProgress());
         dto.setSortOrder(obj.getSortOrder());
+        dto.setWeight(obj.getWeight());
 
         List<KeyResult> krs = krRepository.findByObjectiveIdOrderBySortOrderAsc(obj.getId());
         dto.setKeyResults(krs.stream().map(kr -> mapKeyResult(kr, currentUser)).collect(Collectors.toList()));
@@ -171,12 +191,13 @@ public class OkrServiceImpl implements OkrService {
         dto.setTargetValue(kr.getTargetValue());
         dto.setCurrentValue(kr.getCurrentValue());
         dto.setComputedProgress(kr.getComputedProgress());
-        dto.setOwnerName(kr.getOwner() != null ? kr.getOwner().getEmail() : null);
+        dto.setOwnerName(kr.getOwner() != null ? (kr.getOwner().getName() != null ? kr.getOwner().getName() : kr.getOwner().getEmail()) : null);
         dto.setConfidenceLevel(kr.getConfidenceLevel());
         dto.setDeadline(kr.getDeadline());
         dto.setAlignedProjects(kr.getAlignedProjects());
         dto.setComments(kr.getComments());
         dto.setSortOrder(kr.getSortOrder());
+        dto.setWeight(kr.getWeight());
 
         dto.setCanEdit(permissionService.canEditKeyResult(currentUser, kr));
 
@@ -198,7 +219,6 @@ public class OkrServiceImpl implements OkrService {
         checkAndAudit(actor, "KEY_RESULT", kr.getId(), "confidence_level", kr.getConfidenceLevel(),
                 request.getConfidenceLevel());
         checkAndAudit(actor, "KEY_RESULT", kr.getId(), "comments", kr.getComments(), request.getComments());
-        // ... more fields
 
         if (request.getCurrentValue() != null)
             kr.setCurrentValue(request.getCurrentValue());
@@ -208,6 +228,16 @@ public class OkrServiceImpl implements OkrService {
             kr.setComments(request.getComments());
         if (request.getTitle() != null)
             kr.setTitle(request.getTitle());
+        if (request.getStartValue() != null)
+            kr.setStartValue(request.getStartValue());
+        if (request.getTargetValue() != null)
+            kr.setTargetValue(request.getTargetValue());
+        if (request.getWeight() != null)
+            kr.setWeight(request.getWeight());
+        if (request.getDeadline() != null)
+            kr.setDeadline(request.getDeadline());
+        if (request.getAlignedProjects() != null)
+            kr.setAlignedProjects(request.getAlignedProjects());
 
         // Recalculate KR Progress
         double newProgress = calculationService.calculateKrProgress(kr.getStartValue(), kr.getTargetValue(),
@@ -238,7 +268,6 @@ public class OkrServiceImpl implements OkrService {
     }
 
     private void checkAndAudit(User actor, String type, UUID id, String field, String oldVal, String newVal) {
-        // Simple string comparison. Handling nulls safely.
         String o = oldVal == null ? "" : oldVal;
         String n = newVal == null ? "" : newVal;
         if (!o.equals(n)) {
@@ -252,18 +281,15 @@ public class OkrServiceImpl implements OkrService {
         Objective obj = objectiveRepository.findById(objectiveId)
                 .orElseThrow(() -> new RuntimeException("Objective not found"));
 
-        // Check permissions via the sheet
         if (!permissionService.canEditSheet(actor, obj.getSheet())) {
             throw new RuntimeException("Access Denied: You cannot edit this Objective.");
         }
 
-        // Audit and update title
         if (request.getTitle() != null) {
             checkAndAudit(actor, "OBJECTIVE", obj.getId(), "title", obj.getTitle(), request.getTitle());
             obj.setTitle(request.getTitle());
         }
 
-        // Audit and update owner
         if (request.getOwnerUserId() != null) {
             String oldOwner = obj.getOwner() != null ? obj.getOwner().getId().toString() : null;
             checkAndAudit(actor, "OBJECTIVE", obj.getId(), "owner_user_id", oldOwner, request.getOwnerUserId().toString());
@@ -288,7 +314,6 @@ public class OkrServiceImpl implements OkrService {
             throw new RuntimeException("Access Denied: You cannot add objectives to this sheet.");
         }
 
-        // Get max sort order
         List<Objective> existingObjs = objectiveRepository.findBySheetIdOrderBySortOrderAsc(sheetId);
         int nextSortOrder = existingObjs.isEmpty() ? 1 : existingObjs.get(existingObjs.size() - 1).getSortOrder() + 1;
 
@@ -316,7 +341,6 @@ public class OkrServiceImpl implements OkrService {
             throw new RuntimeException("Access Denied: You cannot add key results to this objective.");
         }
 
-        // Get max sort order
         List<KeyResult> existingKrs = krRepository.findByObjectiveIdOrderBySortOrderAsc(objectiveId);
         int nextSortOrder = existingKrs.isEmpty() ? 1 : existingKrs.get(existingKrs.size() - 1).getSortOrder() + 1;
 
@@ -351,7 +375,6 @@ public class OkrServiceImpl implements OkrService {
 
         OkrSheet sheet = obj.getSheet();
 
-        // Delete all key results first
         List<KeyResult> krs = krRepository.findByObjectiveIdOrderBySortOrderAsc(objectiveId);
         krRepository.deleteAll(krs);
 
@@ -359,7 +382,6 @@ public class OkrServiceImpl implements OkrService {
 
         objectiveRepository.delete(obj);
 
-        // Rollup sheet progress
         rollupSheet(sheet);
     }
 
@@ -379,7 +401,6 @@ public class OkrServiceImpl implements OkrService {
 
         krRepository.delete(kr);
 
-        // Rollup objective and sheet
         rollupObjective(obj);
     }
 }
