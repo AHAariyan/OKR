@@ -82,21 +82,10 @@ public class OkrServiceImpl implements OkrService {
             deptSheets.forEach(s -> summaries.add(mapToSummary(s, user.getDepartment().getName(), cycle)));
         }
 
-        // 4. Personal OKRs
-        if (isOrgLeadershipOrAdmin) {
-            // ORG_LEADERSHIP and SUPER_ADMIN see ALL personal OKR cards
-            List<OkrSheet> allPersonalSheets = sheetRepository.findByCycleIdAndScopeType(cycleId, "PERSONAL");
-            for (OkrSheet s : allPersonalSheets) {
-                String ownerName = userRepository.findById(s.getScopeId())
-                        .map(u -> u.getName() != null ? u.getName() : u.getEmail())
-                        .orElse("Personal");
-                summaries.add(mapToSummary(s, ownerName, cycle));
-            }
-        } else {
-            // Regular users only see their own personal OKR
-            List<OkrSheet> personalSheets = sheetRepository.findByCycleIdAndScopeTypeAndScopeId(cycleId, "PERSONAL", user.getId());
-            personalSheets.forEach(s -> summaries.add(mapToSummary(s, "My OKRs", cycle)));
-        }
+        // 4. Personal OKRs - Everyone only sees their own personal OKR
+        // Super Admin and Org Leadership see Company/Team/Department OKRs but NOT other employees' personal OKRs
+        List<OkrSheet> personalSheets = sheetRepository.findByCycleIdAndScopeTypeAndScopeId(cycleId, "PERSONAL", user.getId());
+        personalSheets.forEach(s -> summaries.add(mapToSummary(s, "My OKRs", cycle)));
 
         DashboardDto dashboard = new DashboardDto();
         dashboard.setSheets(summaries);
