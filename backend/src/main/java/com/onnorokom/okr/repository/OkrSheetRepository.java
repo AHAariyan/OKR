@@ -13,4 +13,8 @@ public interface OkrSheetRepository extends JpaRepository<OkrSheet, UUID> {
     List<OkrSheet> findByCycleIdAndScopeTypeAndScopeId(UUID cycleId, String scopeType, UUID scopeId);
 
     List<OkrSheet> findByCycleIdAndScopeIdIn(UUID cycleId, List<UUID> scopeIds);
+
+    void deleteByScopeTypeAndScopeId(String scopeType, UUID scopeId);
+
+    void deleteByCycleId(UUID cycleId);
 }

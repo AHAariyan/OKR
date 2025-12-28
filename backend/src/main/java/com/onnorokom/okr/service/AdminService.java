@@ -11,11 +11,17 @@ public interface AdminService {
 
     UserDto blockUser(UUID userId, boolean blocked);
 
+    void deleteUser(UUID userId);
+
     List<TeamDto> getAllTeams();
 
     TeamDto createTeam(CreateTeamRequest request);
 
+    void deleteTeam(UUID teamId);
+
     List<DepartmentDto> getAllDepartments();
 
     DepartmentDto createDepartment(CreateDepartmentRequest request);
+
+    void deleteDepartment(UUID departmentId);
 }

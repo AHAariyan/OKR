@@ -34,6 +34,12 @@ public class AdminServiceImpl implements AdminService {
     private OkrSheetRepository okrSheetRepository;
     @Autowired
     private CycleService cycleService;
+    @Autowired
+    private ObjectiveRepository objectiveRepository;
+    @Autowired
+    private KeyResultRepository keyResultRepository;
+    @Autowired
+    private AuditLogRepository auditLogRepository;
 
     @Override
     public List<UserDto> getAllUsers() {
@@ -151,6 +157,17 @@ public class AdminServiceImpl implements AdminService {
         team.setCompany(getOrCreateDefaultCompany());
         team = teamRepository.save(team);
 
+        // Auto-create Team OKR sheet for the active cycle
+        Optional<Cycle> activeCycle = cycleService.getActiveCycle();
+        if (activeCycle.isPresent()) {
+            OkrSheet teamSheet = new OkrSheet();
+            teamSheet.setCycle(activeCycle.get());
+            teamSheet.setScopeType("TEAM");
+            teamSheet.setScopeId(team.getId());
+            teamSheet.setComputedOverallProgress(0.0);
+            okrSheetRepository.save(teamSheet);
+        }
+
         TeamDto dto = new TeamDto();
         dto.setId(team.getId());
         dto.setName(team.getName());
@@ -165,6 +182,64 @@ public class AdminServiceImpl implements AdminService {
         user.setIsBlocked(blocked);
         userRepository.save(user);
         return mapUser(user);
+    }
+
+    @Override
+    @Transactional
+    public void deleteUser(java.util.UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Nullify owner references in key results
+        List<KeyResult> userKeyResults = keyResultRepository.findByOwnerId(userId);
+        for (KeyResult kr : userKeyResults) {
+            kr.setOwner(null);
+            keyResultRepository.save(kr);
+        }
+
+        // Nullify owner references in objectives
+        List<Objective> userObjectives = objectiveRepository.findByOwnerId(userId);
+        for (Objective obj : userObjectives) {
+            obj.setOwner(null);
+            objectiveRepository.save(obj);
+        }
+
+        // Delete role assignments
+        roleAssignmentRepository.deleteByUserId(userId);
+
+        // Delete audit logs for this user
+        auditLogRepository.deleteByActorId(userId);
+
+        // Delete personal OKR sheets (with their objectives and key results)
+        deleteOkrSheetsByScope("PERSONAL", userId);
+
+        // Delete the user
+        userRepository.delete(user);
+    }
+
+    /**
+     * Helper method to delete OKR sheets and all their objectives/key results
+     */
+    private void deleteOkrSheetsByScope(String scopeType, java.util.UUID scopeId) {
+        List<OkrSheet> sheets = okrSheetRepository.findAll().stream()
+                .filter(s -> scopeType.equals(s.getScopeType()) && scopeId.equals(s.getScopeId()))
+                .collect(Collectors.toList());
+
+        for (OkrSheet sheet : sheets) {
+            deleteOkrSheetContents(sheet.getId());
+        }
+        okrSheetRepository.deleteAll(sheets);
+    }
+
+    /**
+     * Helper method to delete objectives and key results for a sheet
+     */
+    private void deleteOkrSheetContents(java.util.UUID sheetId) {
+        List<Objective> objectives = objectiveRepository.findBySheetId(sheetId);
+        for (Objective obj : objectives) {
+            keyResultRepository.deleteByObjectiveId(obj.getId());
+        }
+        objectiveRepository.deleteBySheetId(sheetId);
     }
 
     @Override
@@ -190,11 +265,80 @@ public class AdminServiceImpl implements AdminService {
         dept.setTeam(team);
         dept = departmentRepository.save(dept);
 
+        // Auto-create Department OKR sheet for the active cycle
+        Optional<Cycle> activeCycle = cycleService.getActiveCycle();
+        if (activeCycle.isPresent()) {
+            OkrSheet deptSheet = new OkrSheet();
+            deptSheet.setCycle(activeCycle.get());
+            deptSheet.setScopeType("DEPARTMENT");
+            deptSheet.setScopeId(dept.getId());
+            deptSheet.setComputedOverallProgress(0.0);
+            okrSheetRepository.save(deptSheet);
+        }
+
         DepartmentDto dto = new DepartmentDto();
         dto.setId(dept.getId());
         dto.setName(dept.getName());
         dto.setTeamId(team.getId());
         dto.setTeamName(team.getName());
         return dto;
+    }
+
+    @Override
+    @Transactional
+    public void deleteTeam(java.util.UUID teamId) {
+        Team team = teamRepository.findById(teamId)
+                .orElseThrow(() -> new RuntimeException("Team not found"));
+
+        // Unassign users from this team first (before deleting departments)
+        List<User> teamUsers = userRepository.findByTeamId(teamId);
+        for (User user : teamUsers) {
+            user.setTeam(null);
+            user.setDepartment(null); // Also clear department since it belongs to this team
+            userRepository.save(user);
+        }
+
+        // Get all departments in this team and delete them with their OKR sheets
+        List<Department> departments = departmentRepository.findByTeamId(teamId);
+        for (Department dept : departments) {
+            // Delete department OKR sheets with objectives and key results
+            deleteOkrSheetsByScope("DEPARTMENT", dept.getId());
+            // Delete role assignments for this department scope
+            roleAssignmentRepository.deleteByScopeTypeAndScopeId("DEPARTMENT", dept.getId());
+        }
+        // Delete all departments in this team
+        departmentRepository.deleteAll(departments);
+
+        // Delete team OKR sheets with objectives and key results
+        deleteOkrSheetsByScope("TEAM", teamId);
+
+        // Delete role assignments for this team scope
+        roleAssignmentRepository.deleteByScopeTypeAndScopeId("TEAM", teamId);
+
+        // Delete the team
+        teamRepository.delete(team);
+    }
+
+    @Override
+    @Transactional
+    public void deleteDepartment(java.util.UUID departmentId) {
+        Department dept = departmentRepository.findById(departmentId)
+                .orElseThrow(() -> new RuntimeException("Department not found"));
+
+        // Unassign users from this department
+        List<User> deptUsers = userRepository.findByDepartmentId(departmentId);
+        for (User user : deptUsers) {
+            user.setDepartment(null);
+            userRepository.save(user);
+        }
+
+        // Delete department OKR sheets with objectives and key results
+        deleteOkrSheetsByScope("DEPARTMENT", departmentId);
+
+        // Delete role assignments for this department scope
+        roleAssignmentRepository.deleteByScopeTypeAndScopeId("DEPARTMENT", departmentId);
+
+        // Delete the department
+        departmentRepository.delete(dept);
     }
 }

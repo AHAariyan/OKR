@@ -7,4 +7,8 @@ import java.util.List;
 
 public interface RoleAssignmentRepository extends JpaRepository<RoleAssignment, UUID> {
     List<RoleAssignment> findByUserId(UUID userId);
+
+    void deleteByUserId(UUID userId);
+
+    void deleteByScopeTypeAndScopeId(String scopeType, UUID scopeId);
 }

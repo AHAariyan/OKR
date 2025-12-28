@@ -15,4 +15,6 @@ public interface CycleService {
     java.util.List<com.onnorokom.okr.dto.CycleDto> getAllCycles();
 
     com.onnorokom.okr.dto.CycleDto createCycle(com.onnorokom.okr.dto.CreateCycleRequest request);
+
+    void deleteCycle(java.util.UUID cycleId);
 }

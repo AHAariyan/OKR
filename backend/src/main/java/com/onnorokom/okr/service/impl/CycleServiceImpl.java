@@ -1,19 +1,36 @@
 package com.onnorokom.okr.service.impl;
 
 import com.onnorokom.okr.model.Cycle;
+import com.onnorokom.okr.model.Objective;
+import com.onnorokom.okr.model.OkrSheet;
 import com.onnorokom.okr.repository.CycleRepository;
+import com.onnorokom.okr.repository.KeyResultRepository;
+import com.onnorokom.okr.repository.ObjectiveRepository;
+import com.onnorokom.okr.repository.OkrSheetRepository;
 import com.onnorokom.okr.service.CycleService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 public class CycleServiceImpl implements CycleService {
 
     @Autowired
     private CycleRepository cycleRepository;
+
+    @Autowired
+    private OkrSheetRepository okrSheetRepository;
+
+    @Autowired
+    private ObjectiveRepository objectiveRepository;
+
+    @Autowired
+    private KeyResultRepository keyResultRepository;
 
     @Override
     public Optional<Cycle> getActiveCycle() {
@@ -79,5 +96,30 @@ public class CycleServiceImpl implements CycleService {
         dto.setEndDate(cycle.getEndDate());
         dto.setIsActive(cycle.getIsActive());
         return dto;
+    }
+
+    @Override
+    @Transactional
+    public void deleteCycle(UUID cycleId) {
+        Cycle cycle = cycleRepository.findById(cycleId)
+                .orElseThrow(() -> new RuntimeException("Cycle not found"));
+
+        // Get all OKR sheets for this cycle
+        List<OkrSheet> sheets = okrSheetRepository.findByCycleId(cycleId);
+
+        // Delete objectives and key results for each sheet
+        for (OkrSheet sheet : sheets) {
+            List<Objective> objectives = objectiveRepository.findBySheetId(sheet.getId());
+            for (Objective obj : objectives) {
+                keyResultRepository.deleteByObjectiveId(obj.getId());
+            }
+            objectiveRepository.deleteBySheetId(sheet.getId());
+        }
+
+        // Delete all OKR sheets
+        okrSheetRepository.deleteAll(sheets);
+
+        // Delete the cycle
+        cycleRepository.delete(cycle);
     }
 }

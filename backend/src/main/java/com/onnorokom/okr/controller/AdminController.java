@@ -73,6 +73,12 @@ public class AdminController {
         return adminService.blockUser(id, blocked);
     }
 
+    @DeleteMapping("/users/{id}")
+    public void deleteUser(@PathVariable UUID id) {
+        requireSuperAdmin();
+        adminService.deleteUser(id);
+    }
+
     // ==================== TEAM MANAGEMENT ====================
 
     @GetMapping("/teams")
@@ -85,6 +91,12 @@ public class AdminController {
     public TeamDto createTeam(@RequestBody CreateTeamRequest request) {
         requireSuperAdmin();
         return adminService.createTeam(request);
+    }
+
+    @DeleteMapping("/teams/{id}")
+    public void deleteTeam(@PathVariable UUID id) {
+        requireSuperAdmin();
+        adminService.deleteTeam(id);
     }
 
     // ==================== DEPARTMENT MANAGEMENT ====================
@@ -101,6 +113,12 @@ public class AdminController {
         return adminService.createDepartment(request);
     }
 
+    @DeleteMapping("/departments/{id}")
+    public void deleteDepartment(@PathVariable UUID id) {
+        requireSuperAdmin();
+        adminService.deleteDepartment(id);
+    }
+
     // ==================== CYCLE MANAGEMENT ====================
 
     @GetMapping("/cycles")
@@ -113,5 +131,11 @@ public class AdminController {
     public CycleDto createCycle(@RequestBody CreateCycleRequest request) {
         requireSuperAdmin();
         return cycleService.createCycle(request);
+    }
+
+    @DeleteMapping("/cycles/{id}")
+    public void deleteCycle(@PathVariable UUID id) {
+        requireSuperAdmin();
+        cycleService.deleteCycle(id);
     }
 }

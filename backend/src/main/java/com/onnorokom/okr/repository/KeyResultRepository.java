@@ -7,4 +7,10 @@ import java.util.List;
 
 public interface KeyResultRepository extends JpaRepository<KeyResult, UUID> {
     List<KeyResult> findByObjectiveIdOrderBySortOrderAsc(UUID objectiveId);
+
+    List<KeyResult> findByObjectiveId(UUID objectiveId);
+
+    List<KeyResult> findByOwnerId(UUID ownerId);
+
+    void deleteByObjectiveId(UUID objectiveId);
 }
