@@ -92,6 +92,99 @@ public class OkrServiceImpl implements OkrService {
         return dashboard;
     }
 
+    @Override
+    public HierarchicalDashboardDto getHierarchicalDashboard(User user) {
+        Optional<Cycle> cycleOpt = cycleService.getActiveCycle();
+        if (cycleOpt.isEmpty()) {
+            return new HierarchicalDashboardDto();
+        }
+        Cycle cycle = cycleOpt.get();
+        UUID cycleId = cycle.getId();
+
+        HierarchicalDashboardDto dashboard = new HierarchicalDashboardDto();
+
+        boolean isOrgLeadershipOrAdmin = permissionService.isSuperAdmin(user) || permissionService.isOrgLeadership(user);
+
+        // 1. Company OKRs (visible to all at top level)
+        List<OkrSheet> companySheets = sheetRepository.findByCycleIdAndScopeType(cycleId, "COMPANY");
+        companySheets.forEach(s -> dashboard.getCompanyOkrs().add(mapToSummary(s, "Company OKR", cycle)));
+
+        // 2. Build Team hierarchy
+        List<Team> teams;
+        if (isOrgLeadershipOrAdmin) {
+            teams = teamRepository.findAll();
+        } else if (user.getTeam() != null) {
+            teams = List.of(user.getTeam());
+        } else {
+            teams = List.of();
+        }
+
+        for (Team team : teams) {
+            HierarchicalDashboardDto.TeamNode teamNode = new HierarchicalDashboardDto.TeamNode();
+            teamNode.setId(team.getId().toString());
+            teamNode.setName(team.getName());
+
+            // Team OKR
+            List<OkrSheet> teamSheets = sheetRepository.findByCycleIdAndScopeTypeAndScopeId(cycleId, "TEAM", team.getId());
+            if (!teamSheets.isEmpty()) {
+                teamNode.setTeamOkr(mapToSummary(teamSheets.get(0), team.getName() + " OKR", cycle));
+            }
+
+            // Departments under this team
+            List<Department> departments;
+            if (isOrgLeadershipOrAdmin) {
+                departments = departmentRepository.findByTeamId(team.getId());
+            } else if (user.getDepartment() != null && user.getDepartment().getTeam().getId().equals(team.getId())) {
+                departments = List.of(user.getDepartment());
+            } else {
+                departments = List.of();
+            }
+
+            for (Department dept : departments) {
+                HierarchicalDashboardDto.DepartmentNode deptNode = new HierarchicalDashboardDto.DepartmentNode();
+                deptNode.setId(dept.getId().toString());
+                deptNode.setName(dept.getName());
+
+                // Department OKR
+                List<OkrSheet> deptSheets = sheetRepository.findByCycleIdAndScopeTypeAndScopeId(cycleId, "DEPARTMENT", dept.getId());
+                if (!deptSheets.isEmpty()) {
+                    deptNode.setDepartmentOkr(mapToSummary(deptSheets.get(0), dept.getName() + " OKR", cycle));
+                }
+
+                // Members under this department (only for admins, and exclude current user's personal OKR here)
+                if (isOrgLeadershipOrAdmin) {
+                    List<User> members = userRepository.findByDepartmentId(dept.getId());
+                    for (User member : members) {
+                        if (member.getId().equals(user.getId())) continue; // Skip self, will be shown separately
+
+                        HierarchicalDashboardDto.MemberNode memberNode = new HierarchicalDashboardDto.MemberNode();
+                        memberNode.setId(member.getId().toString());
+                        memberNode.setName(member.getName() != null ? member.getName() : member.getEmail());
+                        memberNode.setEmail(member.getEmail());
+
+                        List<OkrSheet> memberSheets = sheetRepository.findByCycleIdAndScopeTypeAndScopeId(cycleId, "PERSONAL", member.getId());
+                        if (!memberSheets.isEmpty()) {
+                            memberNode.setPersonalOkr(mapToSummary(memberSheets.get(0), member.getName() != null ? member.getName() : "Personal OKR", cycle));
+                        }
+                        deptNode.getMembers().add(memberNode);
+                    }
+                }
+
+                teamNode.getDepartments().add(deptNode);
+            }
+
+            dashboard.getTeams().add(teamNode);
+        }
+
+        // 3. My Personal OKR (always shown separately)
+        List<OkrSheet> personalSheets = sheetRepository.findByCycleIdAndScopeTypeAndScopeId(cycleId, "PERSONAL", user.getId());
+        if (!personalSheets.isEmpty()) {
+            dashboard.setMyPersonalOkr(mapToSummary(personalSheets.get(0), "My OKRs", cycle));
+        }
+
+        return dashboard;
+    }
+
     private SheetSummaryDto mapToSummary(OkrSheet sheet, String titleFallback, Cycle cycle) {
         SheetSummaryDto dto = new SheetSummaryDto();
         dto.setId(sheet.getId());

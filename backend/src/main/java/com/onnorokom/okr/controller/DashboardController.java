@@ -1,6 +1,7 @@
 package com.onnorokom.okr.controller;
 
 import com.onnorokom.okr.dto.DashboardDto;
+import com.onnorokom.okr.dto.HierarchicalDashboardDto;
 import com.onnorokom.okr.security.CustomUserDetailsService;
 import com.onnorokom.okr.service.OkrService;
 import com.onnorokom.okr.model.User;
@@ -23,7 +24,16 @@ public class DashboardController {
     private UserRepository userRepository;
 
     @GetMapping
-    public DashboardDto getDashboard() {
+    public HierarchicalDashboardDto getDashboard() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String email = auth.getName();
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new RuntimeException("User not found"));
+
+        return okrService.getHierarchicalDashboard(user);
+    }
+
+    @GetMapping("/flat")
+    public DashboardDto getFlatDashboard() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         String email = auth.getName();
         User user = userRepository.findByEmail(email).orElseThrow(() -> new RuntimeException("User not found"));

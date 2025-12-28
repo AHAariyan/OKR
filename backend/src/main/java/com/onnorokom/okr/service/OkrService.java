@@ -7,6 +7,8 @@ import java.util.UUID;
 public interface OkrService {
     DashboardDto getDashboard(User user);
 
+    HierarchicalDashboardDto getHierarchicalDashboard(User user);
+
     SheetDetailDto getSheetDetails(UUID sheetId);
 
     KeyResultDto updateKeyResult(UUID krId, UpdateKeyResultRequest request, User actor);
